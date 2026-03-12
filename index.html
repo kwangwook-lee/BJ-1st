@@ -235,6 +235,9 @@
           <h2 class="font-bold text-slate-700 flex items-center gap-2">
             <i data-lucide="file-text" class="w-5 h-5 text-indigo-500"></i> 제출 현황 (<span id="admin-count">0</span>건)
           </h2>
+          <button onclick="window.exportToExcel()" class="px-3 py-1.5 bg-green-600 hover:bg-green-700 text-white rounded-lg text-xs font-bold transition-colors flex items-center gap-1.5 shadow-sm">
+            <i data-lucide="download" class="w-4 h-4"></i> 엑셀 내보내기
+          </button>
         </div>
         <div class="overflow-x-auto">
           <table class="w-full text-left border-collapse text-sm">
@@ -725,6 +728,60 @@ Thank you for listening to my speech.`;
 
     window.closeDetailModal = () => {
       detailModal.classList.add('hidden');
+    };
+
+    // --- 엑셀(CSV) 내보내기 로직 ---
+    window.exportToExcel = () => {
+      if (allSubmissions.length === 0) {
+        alert("내보낼 데이터가 없습니다.");
+        return;
+      }
+
+      // 1. 헤더 설정 및 UTF-8 한글 깨짐 방지 BOM(\uFEFF) 추가
+      const headers = ['학번', '이름', 'SDG 목표', '영어(문장수)', '한글(문장수)', '제출시간', '영어 대본', '한글 요약'];
+      let csvContent = "\uFEFF" + headers.join(',') + '\n'; 
+
+      // 2. 데이터 변환
+      allSubmissions.forEach(entry => {
+        const sdg = sdgs.find(s => s.id === entry.selectedSDG);
+        const sdgText = sdg ? `Goal ${sdg.id}: ${sdg.shortTitle.replace(/\n/g, ' ')}` : '';
+        const dateStr = entry.timestamp ? new Date(entry.timestamp.seconds * 1000).toLocaleString('ko-KR') : '';
+
+        // 엑셀에서 내용 안의 쉼표나 줄바꿈이 깨지지 않도록 이스케이프 처리
+        const escapeCsv = (text) => {
+          if (text === null || text === undefined) return '""';
+          const stringified = String(text);
+          return '"' + stringified.replace(/"/g, '""') + '"'; 
+        };
+
+        const row = [
+          escapeCsv(entry.studentId),
+          escapeCsv(entry.studentName),
+          escapeCsv(sdgText),
+          escapeCsv(entry.engSentenceCount),
+          escapeCsv(entry.korSentenceCount),
+          escapeCsv(dateStr),
+          escapeCsv(entry.speechContent),
+          escapeCsv(entry.koreanSummary)
+        ];
+
+        csvContent += row.join(',') + '\n';
+      });
+
+      // 3. 다운로드 트리거
+      const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+      const link = document.createElement("a");
+      const url = URL.createObjectURL(blob);
+      
+      const date = new Date();
+      const fileNameDate = `${date.getFullYear()}${(date.getMonth()+1).toString().padStart(2, '0')}${date.getDate().toString().padStart(2, '0')}`;
+      
+      link.setAttribute("href", url);
+      link.setAttribute("download", `배정고_공통영어_수행평가_${fileNameDate}.csv`);
+      link.style.visibility = 'hidden';
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
     };
 
   </script>
