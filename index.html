@@ -534,21 +534,45 @@ Thank you for listening to my speech.`;
     // --- Firebase 연동 로직 ---
     async function initFirebase() {
       try {
+        // 👇👇👇 선생님의 Firebase 프로젝트 설정값을 아래에 붙여넣으세요! 👇👇👇
+        // (따옴표 안의 값을 선생님의 값으로 변경하시면 됩니다. 비워두시면 테스트 모드로 동작합니다.)
+        const myFirebaseConfig = {
+          apiKey: "AIzaSyBXBo5ehfEO3N9m1EXbMODvotL2MdhMY-g",
+          authDomain: "bj-1-e0b36.firebaseapp.com",
+          projectId: "bj-1-e0b36",
+          storageBucket: "bj-1-e0b36.firebasestorage.app",
+          messagingSenderId: "311712504287",
+          appId: "1:311712504287:web:f2fdfb99c490e9a2c24c6a"
+        };
+        // 👆👆👆 여기까지 수정 완료 👆👆👆
+
         let config = null;
-        if (typeof window.__firebase_config !== 'undefined') {
+
+        // 사용자가 깃허브에 올리기 위해 직접 설정값을 입력한 경우 (apiKey가 비어있지 않은 경우)
+        if (myFirebaseConfig && myFirebaseConfig.apiKey && myFirebaseConfig.apiKey.trim() !== "") {
+          config = myFirebaseConfig;
+          appIdRef = 'baejeong-english-2024'; // 원하는 고유 이름으로 설정 가능
+        } 
+        // 캔버스(미리보기) 환경용 설정 가져오기
+        else if (typeof window.__firebase_config !== 'undefined' && window.__firebase_config) {
           config = typeof window.__firebase_config === 'string' ? JSON.parse(window.__firebase_config) : window.__firebase_config;
           appIdRef = typeof window.__app_id !== 'undefined' ? window.__app_id : 'default-app-id';
         }
-        
-        if (config && Object.keys(config).length > 0) {
+
+        if (config && Object.keys(config).length > 0 && config.apiKey) {
           const app = initializeApp(config);
           const authRef = getAuth(app);
           dbRef = getFirestore(app);
           
-          if (typeof window.__initial_auth_token !== 'undefined' && window.__initial_auth_token) {
-            await signInWithCustomToken(authRef, window.__initial_auth_token);
-          } else {
-            await signInAnonymously(authRef);
+          try {
+            if (typeof window.__initial_auth_token !== 'undefined' && window.__initial_auth_token) {
+              await signInWithCustomToken(authRef, window.__initial_auth_token);
+            } else {
+              await signInAnonymously(authRef);
+            }
+          } catch(e) {
+            // console.error 대신 warn을 사용하여 화면에 큰 에러창이 뜨는 것을 방지합니다.
+            console.warn("Firebase 인증 실패 (데이터베이스 설정이 없거나 네트워크 문제일 수 있습니다. 테스트 모드로 동작합니다.)", e.message);
           }
 
           onAuthStateChanged(authRef, (u) => {
@@ -559,7 +583,7 @@ Thank you for listening to my speech.`;
           console.warn("데이터베이스 연결 설정이 없습니다. UI만 체험할 수 있습니다.");
         }
       } catch (err) {
-        console.error("Firebase 초기화 에러:", err);
+        console.warn("Firebase 초기화 에러:", err.message);
       }
     }
 
@@ -568,7 +592,7 @@ Thank you for listening to my speech.`;
       e.preventDefault();
       
       if (!dbRef || !currentUser) {
-        alert("현재 데이터베이스 설정이 연동되지 않았습니다. (GitHub 화면 테스트 모드)");
+        alert("현재 데이터베이스 설정이 연동되지 않았습니다. (테스트 모드: 실제 제출은 되지 않습니다.)\n\n※ GitHub 배포 시 코드 하단에 Firebase 설정값을 입력해 주세요.");
         document.getElementById('submit-form').classList.add('hidden');
         document.getElementById('submit-success').classList.remove('hidden');
         window.scrollTo(0,0);
@@ -599,7 +623,7 @@ Thank you for listening to my speech.`;
         document.getElementById('submit-success').classList.remove('hidden');
         window.scrollTo(0,0);
       } catch (error) {
-        console.error(error);
+        console.warn(error);
         alert('제출 중 오류가 발생했습니다.');
       } finally {
         btn.disabled = false;
@@ -663,7 +687,7 @@ Thank you for listening to my speech.`;
         allSubmissions.sort((a, b) => (b.timestamp?.seconds || 0) - (a.timestamp?.seconds || 0));
         renderAdminTable();
       }, (error) => {
-        console.error("데이터 로드 에러:", error);
+        console.warn("데이터 로드 에러:", error.message);
       });
     }
 
