@@ -141,12 +141,36 @@
       <!-- 탭 3: 과제 제출 폼 -->
       <div id="tab-submit" class="fade-in hidden">
         <!-- 제출 성공 화면 -->
-        <div id="submit-success" class="hidden bg-white p-12 rounded-2xl shadow-sm border border-slate-200 text-center">
+        <div id="submit-success" class="hidden bg-white p-6 md:p-12 rounded-2xl shadow-sm border border-slate-200 text-center">
           <div class="w-20 h-20 bg-green-100 text-green-600 rounded-full flex items-center justify-center mx-auto mb-6">
             <i data-lucide="check-circle" class="w-10 h-10"></i>
           </div>
           <h2 class="text-2xl font-black mb-2 text-slate-800">과제 제출 성공!</h2>
-          <p class="text-slate-500 text-sm mb-8">여러분의 멋진 비전이 선생님께 전달되었습니다.</p>
+          <p class="text-slate-500 text-sm mb-6">여러분의 멋진 비전이 선생님께 전달되었습니다.</p>
+          
+          <!-- 작성한 내용 확인 영역 추가 -->
+          <div class="text-left bg-slate-50 p-5 rounded-xl border border-slate-200 mb-8 space-y-4">
+            <h3 class="font-black text-indigo-700 border-b border-slate-200 pb-2 text-sm flex items-center gap-1.5"><i data-lucide="file-check" class="w-4 h-4"></i> 제출 내역 확인</h3>
+            <div class="grid grid-cols-2 gap-4">
+              <div>
+                <p class="text-[11px] font-bold text-slate-400 mb-1">학번 및 이름</p>
+                <p id="success-display-student" class="text-sm font-bold text-slate-800"></p>
+              </div>
+              <div>
+                <p class="text-[11px] font-bold text-slate-400 mb-1">선택한 주제</p>
+                <p id="success-display-sdg" class="text-sm font-bold text-indigo-600"></p>
+              </div>
+            </div>
+            <div>
+              <p class="text-[11px] font-bold text-slate-400 mb-1 flex items-center gap-1"><i data-lucide="type" class="w-3 h-3"></i> 영어 발표 대본</p>
+              <div id="success-display-eng" class="bg-white p-3 rounded-lg border border-slate-200 text-xs text-slate-700 whitespace-pre-wrap leading-relaxed"></div>
+            </div>
+            <div>
+              <p class="text-[11px] font-bold text-slate-400 mb-1 flex items-center gap-1"><i data-lucide="languages" class="w-3 h-3"></i> 한글 요약</p>
+              <div id="success-display-kor" class="bg-white p-3 rounded-lg border border-slate-200 text-xs text-slate-700 whitespace-pre-wrap leading-relaxed"></div>
+            </div>
+          </div>
+
           <button onclick="window.resetForm()" class="px-10 py-3 bg-indigo-600 text-white rounded-xl font-bold hover:bg-indigo-700 transition-all text-sm">새 과제 작성하기</button>
         </div>
 
@@ -156,6 +180,7 @@
             <div class="space-y-2">
               <label class="text-xs font-bold text-slate-600 flex items-center gap-1.5"><i data-lucide="hash" class="w-3.5 h-3.5 text-indigo-500"></i> 학번 (5자리)</label>
               <input type="text" id="input-id" placeholder="예: 10101" maxlength="5" class="w-full px-4 py-3.5 rounded-xl border border-slate-200 focus:border-indigo-500 focus:ring-2 focus:ring-indigo-100 outline-none transition-all font-bold text-sm bg-slate-50" required />
+              <p id="id-error-msg" class="hidden text-[11px] font-bold text-red-500 mt-1 ml-1 animate-pulse">※ 학번 5자리를 정확히 입력해 주세요.</p>
             </div>
             <div class="space-y-2">
               <label class="text-xs font-bold text-slate-600 flex items-center gap-1.5"><i data-lucide="user" class="w-3.5 h-3.5 text-indigo-500"></i> 이름</label>
@@ -250,7 +275,7 @@
                 <th class="px-4 py-3 font-bold text-center">영어(20+)</th>
                 <th class="px-4 py-3 font-bold text-center">한글(10+)</th>
                 <th class="px-4 py-3 font-bold">제출 시간</th>
-                <th class="px-4 py-3 font-bold text-center">상세</th>
+                <th class="px-4 py-3 font-bold text-center">관리</th>
               </tr>
             </thead>
             <tbody id="admin-table-body" class="divide-y divide-slate-100">
@@ -317,7 +342,8 @@
     // Firebase 연결 모듈 (CDN 방식)
     import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
     import { getAuth, signInAnonymously, onAuthStateChanged, signInWithCustomToken } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
-    import { getFirestore, collection, addDoc, serverTimestamp, query, onSnapshot } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+    // deleteDoc 및 doc 함수 추가 임포트
+    import { getFirestore, collection, addDoc, serverTimestamp, query, onSnapshot, deleteDoc, doc } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
 
     // --- 데이터 정의 ---
     const sdgs = [
@@ -529,7 +555,21 @@ Thank you for listening to my speech.`;
 
     inputSpeech.addEventListener('input', updateCounters);
     inputKorean.addEventListener('input', updateCounters);
-    inputId.addEventListener('input', (e) => { e.target.value = e.target.value.replace(/[^0-9]/g, ''); });
+    inputId.addEventListener('input', (e) => { 
+      e.target.value = e.target.value.replace(/[^0-9]/g, ''); 
+      
+      // 학번 5자리 실시간 에러 표시 로직
+      const errorMsg = document.getElementById('id-error-msg');
+      if (e.target.value.length > 0 && e.target.value.length !== 5) {
+        errorMsg.classList.remove('hidden');
+        e.target.classList.add('border-red-400', 'bg-red-50');
+        e.target.classList.remove('border-slate-200', 'bg-slate-50');
+      } else {
+        errorMsg.classList.add('hidden');
+        e.target.classList.remove('border-red-400', 'bg-red-50');
+        e.target.classList.add('border-slate-200', 'bg-slate-50');
+      }
+    });
 
     // --- Firebase 연동 로직 ---
     async function initFirebase() {
@@ -591,6 +631,17 @@ Thank you for listening to my speech.`;
     document.getElementById('submit-form').addEventListener('submit', async (e) => {
       e.preventDefault();
       
+      // 1. 학번 유효성 검사를 무조건 가장 먼저 실행 (4자리 이하 강제 차단)
+      if (inputId.value.trim().length !== 5) {
+        const errorMsg = document.getElementById('id-error-msg');
+        if(errorMsg) errorMsg.classList.remove('hidden');
+        inputId.classList.add('border-red-400', 'bg-red-50');
+        inputId.focus();
+        alert('학번 5자리를 정확히 입력해주세요. (예: 10101)');
+        return;
+      }
+      
+      // 2. 그 다음 데이터베이스 상태 체크
       if (!dbRef || !currentUser) {
         alert("현재 데이터베이스 설정이 연동되지 않았습니다. (테스트 모드: 실제 제출은 되지 않습니다.)\n\n※ GitHub 배포 시 코드 하단에 Firebase 설정값을 입력해 주세요.");
         document.getElementById('submit-form').classList.add('hidden');
@@ -598,8 +649,6 @@ Thank you for listening to my speech.`;
         window.scrollTo(0,0);
         return;
       }
-      
-      if (inputId.value.length !== 5) return alert('학번 5자리를 정확히 입력해주세요 (예: 10101)');
 
       const btn = document.getElementById('submit-btn');
       btn.disabled = true;
@@ -619,9 +668,17 @@ Thank you for listening to my speech.`;
           userId: currentUser.uid
         });
         
+        // --- 제출 성공 화면에 방금 작성한 데이터 채워넣기 ---
+        const selectedSdgObj = sdgs.find(s => s.id === parseInt(inputSdg.value));
+        document.getElementById('success-display-student').innerText = `${inputId.value} ${inputName.value}`;
+        document.getElementById('success-display-sdg').innerText = selectedSdgObj ? `Goal ${selectedSdgObj.id}. ${selectedSdgObj.shortTitle.replace('\n', ' ')}` : '';
+        document.getElementById('success-display-eng').innerText = inputSpeech.value;
+        document.getElementById('success-display-kor').innerText = inputKorean.value;
+        
         document.getElementById('submit-form').classList.add('hidden');
         document.getElementById('submit-success').classList.remove('hidden');
         window.scrollTo(0,0);
+        lucide.createIcons(); // 새 화면의 아이콘 렌더링
       } catch (error) {
         console.warn(error);
         alert('제출 중 오류가 발생했습니다.');
@@ -641,6 +698,60 @@ Thank you for listening to my speech.`;
       updateCounters();
       document.getElementById('submit-form').classList.remove('hidden');
       document.getElementById('submit-success').classList.add('hidden');
+    };
+    
+    // --- 내 과제 조회 기능 로직 ---
+    window.checkMySubmission = async () => {
+      if (!dbRef) return alert("데이터베이스가 연결되지 않았습니다.");
+      
+      const cid = document.getElementById('check-id').value;
+      const cname = document.getElementById('check-name').value.trim();
+      
+      if(cid.length !== 5) {
+        document.getElementById('check-id').focus();
+        return alert("학번 5자리를 정확히 입력해주세요.");
+      }
+      if(!cname) {
+        document.getElementById('check-name').focus();
+        return alert("이름을 입력해주세요.");
+      }
+
+      const btn = document.getElementById('btn-check-search');
+      btn.disabled = true;
+      btn.innerHTML = `<i data-lucide="loader" class="w-5 h-5 animate-spin text-white"></i> 시스템 조회 중...`;
+      lucide.createIcons();
+
+      try {
+        const q = query(collection(dbRef, 'artifacts', appIdRef, 'public', 'data', 'submissions'),
+          where("studentId", "==", cid),
+          where("studentName", "==", cname)
+        );
+        const snapshot = await getDocs(q);
+
+        if(snapshot.empty) {
+          alert("일치하는 제출 내역이 없습니다.\n제출 시 입력한 학번과 이름이 정확한지 확인해주세요.");
+          document.getElementById('check-result').classList.add('hidden');
+        } else {
+          // 동일 학생이 여러 번 낸 경우 가장 마지막에 낸 최신 데이터를 불러옴
+          const docs = snapshot.docs.map(d => d.data());
+          docs.sort((a, b) => (b.timestamp?.seconds || 0) - (a.timestamp?.seconds || 0));
+          const myData = docs[0];
+
+          const sdgObj = sdgs.find(s => s.id === myData.selectedSDG);
+          document.getElementById('check-res-sdg').innerText = sdgObj ? `Goal ${sdgObj.id}. ${sdgObj.shortTitle.replace(/\n/g, ' ')}` : '선택 안 함';
+          document.getElementById('check-res-eng').innerText = myData.speechContent;
+          document.getElementById('check-res-kor').innerText = myData.koreanSummary;
+
+          document.getElementById('check-result').classList.remove('hidden');
+        }
+      } catch(e) {
+         console.error(e);
+         alert("조회 중 오류가 발생했습니다. 잠시 후 다시 시도해주세요.");
+      } finally {
+        btn.disabled = false;
+        btn.innerHTML = `<i data-lucide="search" class="w-5 h-5 text-white"></i> 내 제출 내역 불러오기`;
+        lucide.createIcons();
+      }
     };
 
     // --- 관리자 모드 로직 ---
@@ -684,7 +795,12 @@ Thank you for listening to my speech.`;
       
       unsubSnapshot = onSnapshot(q, (snapshot) => {
         allSubmissions = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-        allSubmissions.sort((a, b) => (b.timestamp?.seconds || 0) - (a.timestamp?.seconds || 0));
+        // 학번(studentId) 오름차순으로 정렬 변경
+        allSubmissions.sort((a, b) => {
+          const idA = a.studentId || "";
+          const idB = b.studentId || "";
+          return idA.localeCompare(idB);
+        });
         renderAdminTable();
       }, (error) => {
         console.warn("데이터 로드 에러:", error.message);
@@ -703,37 +819,81 @@ Thank you for listening to my speech.`;
       document.getElementById('admin-empty').classList.add('hidden');
 
       let html = '';
+      
+      // 1. 반별로 학생 데이터 그룹화하기
+      const groupedSubmissions = {};
       allSubmissions.forEach(entry => {
-        const sdg = sdgs.find(s => s.id === entry.selectedSDG);
-        const color = sdg ? sdg.color : '#94a3b8';
-        const dateStr = entry.timestamp ? new Date(entry.timestamp.seconds * 1000).toLocaleString('ko-KR') : '-';
-        const engClass = entry.engSentenceCount >= 20 ? 'text-green-600' : 'text-orange-500';
-        const korClass = entry.korSentenceCount >= 10 ? 'text-green-600' : 'text-orange-500';
+        // 학번 5자리 기준: 1학년(1자리) + 반(2자리) + 번호(2자리)
+        // 예: 10305 -> 1학년 03반 05번 -> 반은 '03' -> 숫자 3
+        const idStr = entry.studentId || "00000";
+        const classNumStr = idStr.length === 5 ? idStr.substring(1, 3) : "기타";
+        const classNum = classNumStr !== "기타" ? parseInt(classNumStr, 10) : "기타";
+        
+        if (!groupedSubmissions[classNum]) {
+          groupedSubmissions[classNum] = [];
+        }
+        groupedSubmissions[classNum].push(entry);
+      });
 
+      // 2. 반 번호 순서대로 정렬 (예: 1반 -> 2반 -> ... -> 기타)
+      const sortedClasses = Object.keys(groupedSubmissions).sort((a, b) => {
+        if (a === "기타") return 1;
+        if (b === "기타") return -1;
+        return parseInt(a) - parseInt(b);
+      });
+
+      // 3. 화면에 반별로 구분하여 렌더링
+      sortedClasses.forEach(className => {
+        // 반 구분 헤더 (구분선 역할)
+        const displayClassName = className === "기타" ? "기타 (학번 오류)" : `1학년 ${className}반`;
         html += `
-          <tr class="hover:bg-slate-50/50 transition-colors">
-            <td class="px-4 py-3 font-mono font-bold text-indigo-600">${entry.studentId}</td>
-            <td class="px-4 py-3 font-bold text-slate-800">${entry.studentName}</td>
-            <td class="px-4 py-3 text-center">
-              <span class="inline-block px-2 py-0.5 rounded-md text-[10px] font-bold text-white shadow-sm" style="background-color: ${color}">
-                G${entry.selectedSDG}
-              </span>
-            </td>
-            <td class="px-4 py-3 text-center font-bold">
-              <span class="${engClass}">${entry.engSentenceCount}</span>
-            </td>
-            <td class="px-4 py-3 text-center font-bold">
-              <span class="${korClass}">${entry.korSentenceCount}</span>
-            </td>
-            <td class="px-4 py-3 text-xs text-slate-500">${dateStr}</td>
-            <td class="px-4 py-3 text-center">
-              <button onclick="window.openDetailModal('${entry.id}')" class="p-1.5 text-indigo-600 hover:bg-indigo-50 rounded-lg transition-colors">
-                <i data-lucide="external-link" class="w-4 h-4"></i>
-              </button>
+          <tr class="bg-indigo-50 border-y border-indigo-100">
+            <td colspan="7" class="px-4 py-2.5 font-black text-indigo-800 text-sm">
+              <div class="flex items-center gap-2">
+                <i data-lucide="users" class="w-4 h-4"></i> ${displayClassName} 
+                <span class="text-xs font-bold text-indigo-600 bg-white px-2 py-0.5 rounded-full border border-indigo-200 shadow-sm">${groupedSubmissions[className].length}명 제출</span>
+              </div>
             </td>
           </tr>
         `;
+
+        // 해당 반의 학생 목록 렌더링
+        groupedSubmissions[className].forEach(entry => {
+          const sdg = sdgs.find(s => s.id === entry.selectedSDG);
+          const color = sdg ? sdg.color : '#94a3b8';
+          const dateStr = entry.timestamp ? new Date(entry.timestamp.seconds * 1000).toLocaleString('ko-KR') : '-';
+          const engClass = entry.engSentenceCount >= 20 ? 'text-green-600' : 'text-orange-500';
+          const korClass = entry.korSentenceCount >= 10 ? 'text-green-600' : 'text-orange-500';
+
+          html += `
+            <tr class="hover:bg-slate-50/50 transition-colors border-b border-slate-50 last:border-0">
+              <td class="px-4 py-3 font-mono font-bold text-indigo-600 pl-6">${entry.studentId}</td>
+              <td class="px-4 py-3 font-bold text-slate-800">${entry.studentName}</td>
+              <td class="px-4 py-3 text-center">
+                <span class="inline-block px-2 py-0.5 rounded-md text-[10px] font-bold text-white shadow-sm" style="background-color: ${color}">
+                  G${entry.selectedSDG}
+                </span>
+              </td>
+              <td class="px-4 py-3 text-center font-bold">
+                <span class="${engClass}">${entry.engSentenceCount}</span>
+              </td>
+              <td class="px-4 py-3 text-center font-bold">
+                <span class="${korClass}">${entry.korSentenceCount}</span>
+              </td>
+              <td class="px-4 py-3 text-xs text-slate-500">${dateStr}</td>
+              <td class="px-4 py-3 text-center flex justify-center gap-2">
+                <button onclick="window.openDetailModal('${entry.id}')" class="p-1.5 text-indigo-600 hover:bg-indigo-50 rounded-lg transition-colors" title="상세보기">
+                  <i data-lucide="external-link" class="w-4 h-4"></i>
+                </button>
+                <button onclick="window.deleteSubmission('${entry.id}')" class="p-1.5 text-red-500 hover:bg-red-50 rounded-lg transition-colors" title="삭제하기">
+                  <i data-lucide="trash-2" class="w-4 h-4"></i>
+                </button>
+              </td>
+            </tr>
+          `;
+        });
       });
+      
       tbody.innerHTML = html;
       lucide.createIcons();
     }
@@ -755,7 +915,22 @@ Thank you for listening to my speech.`;
       detailModal.classList.add('hidden');
     };
 
-    // --- 엑셀(CSV) 내보내기 로직 추가 ---
+    // --- 개별 과제 삭제 로직 추가 ---
+    window.deleteSubmission = async (docId) => {
+      if (!dbRef) return;
+      
+      if (confirm("정말로 이 학생의 과제를 삭제하시겠습니까?\n삭제 후에는 복구할 수 없습니다.")) {
+        try {
+          await deleteDoc(doc(dbRef, 'artifacts', appIdRef, 'public', 'data', 'submissions', docId));
+          alert("삭제가 완료되었습니다.");
+        } catch (error) {
+          console.error("삭제 중 오류 발생:", error);
+          alert("삭제 중 오류가 발생했습니다.");
+        }
+      }
+    };
+
+    // --- 엑셀(CSV) 내보내기 로직 ---
     window.exportToExcel = () => {
       if (allSubmissions.length === 0) {
         alert("내보낼 데이터가 없습니다.");
